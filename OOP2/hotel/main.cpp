@@ -4,6 +4,13 @@
 
 using namespace std;
 
+// Демонстрація поліморфізму через посилання
+void showRoomDetails(const Room& r) {
+    cout << "Опис: "
+         << r.getDescription()
+         << endl;
+}
+
 void printMainMenu() {
     cout << "\n╔══════════════════════════════╗\n";
     cout << "║  Iнформаційна система Готель ║\n";
