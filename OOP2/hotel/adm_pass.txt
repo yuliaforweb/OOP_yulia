@@ -1,0 +1,4 @@
+Логін: admin, пароль: admin123
+Логін: manager, пароль: manager123
+Логін: recept, пароль: reception123
+

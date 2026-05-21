@@ -1,44 +1,29 @@
-#ifndef HOTEL_HOTEL_H
-#define HOTEL_HOTEL_H
-#pragma once
-#include <vector>
+#ifndef HOTEL_H
+#define HOTEL_H
+
 #include <string>
-#include "rooms.h"
-#include "booking.h"
+#include "external/json.hpp"
 
 class HotelSystem {
-private:
-    vector<Room*>    rooms;
-    vector<Guest*>   guests;
-    vector<Booking*> bookings;
-    int nextGuestId   = 1;
-    int nextBookingId = 1;
-
-    Guest* findOrCreateGuest();
-    bool   isValidDate(const string& d);
-    void   split(const string& s, char del,
-                 vector<string>& out);
 public:
-    HotelSystem()  {}
-    ~HotelSystem();
-
-    Room* operator[](int index);
-
-    void addRoom(Room* r);
-
-    vector<Room*> checkAvailability(
-        const string& ci, const string& co);
-
-    void showAvailableRooms();
-    void createBooking();
-    void cancelBooking();
-    void checkIn();
-    void checkOut();
-    void showGuests()    const;
-    void showBookings()  const;
-    void generateReport() const;
-
-    void saveData()  const;
+    HotelSystem();
     void loadData();
+    std::string getAvailableRoomsStr(const std::string& checkIn, const std::string& checkOut);
+    bool addBookingFromStaff(const std::string& name, const std::string& phone, const std::string& passport, int roomNum, const std::string& checkIn, const std::string& checkOut);
+
+    bool addBookingFromWeb(const std::string& guest, const std::string& phone, const std::string& passport, int cat, const std::string& checkIn, const std::string& checkOut);
+    bool addBookingFromWebExtended(const std::string& guest, const std::string& phone, const std::string& passport, int cat, const std::string& checkIn, const std::string& checkOut, const std::string& payMethod);
+
+    bool updateBookingData(int bookingId, const std::string& name, const std::string& phone, const std::string& passport, const std::string& checkIn, const std::string& checkOut);
+    bool exportPaymentsToExcel(const std::string& filename);
+    std::string getGuestsStr();
+    std::string getReservationsStr(const std::string& passportFilter = "");
+    std::string getOccupancyReportStr(const std::string& start, const std::string& end);
+    std::string getFinancialReportStr(const std::string& start, const std::string& end);
+    nlohmann::json getBookingJsonByPassport(const std::string& passport);
+
+    bool processReceptionPayment(int bookingId, const std::string& method);
+    std::string authenticateStaff(int roleIdx, const std::string& password);
 };
-#endif //HOTEL_HOTEL_H
+
+#endif // HOTEL_H
