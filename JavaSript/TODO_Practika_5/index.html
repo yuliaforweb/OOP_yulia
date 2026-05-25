@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>Task Management Todo - Практична №5</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        h1, h2 {
+            color: #2c3e50;
+        }
+        .stats-panel {
+            display: flex;
+            gap: 15px;
+            background: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+            background: #eef2f5;
+            border-radius: 6px;
+        }
+        .main-layout {
+            display: flex;
+            gap: 20px;
+        }
+        .left-column {
+            flex: 1;
+        }
+        .right-column {
+            flex: 1.5;
+        }
+        .task-form, .filter-panel, .task-list {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input, .form-group textarea, .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        .task-item {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            margin-bottom: 10px;
+            background: #fafafa;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .task-item.completed {
+            background-color: #d4edda;
+            border-left: 5px solid #2ecc71;
+        }
+        .task-item.overdue {
+            background-color: #f8d7da;
+            border-left: 5px solid #dc3545;
+        }
+        .task-actions button {
+            margin-left: 5px;
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+        .btn-complete { background-color: #2ecc71; }
+        .btn-delete { background-color: #e74c3c; }
+        .filter-group {
+            margin-bottom: 10px;
+        }
+        .filter-buttons {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+        .btn-filter {
+            background-color: #95a5a6;
+            padding: 6px 12px;
+            font-size: 13px;
+        }
+        .btn-filter.active {
+            background-color: #2c3e50;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Система управління задачами (TODO)</h1>
+
+    <div class="stats-panel">
+        <div class="stat-card">Всього: <span id="stat-total">0</span></div>
+        <div class="stat-card">Виконано: <span id="stat-completed">0</span></div>
+        <div class="stat-card">В черзі: <span id="stat-pending">0</span></div>
+        <div class="stat-card">Протерміновано: <span id="stat-overdue">0</span></div>
+        <div class="stat-card">Успішність: <span id="stat-rate">0</span>%</div>
+    </div>
+
+    <div class="main-layout">
+        <div class="left-column">
+            <div class="task-form">
+                <h2 id="form-title">Створити задачу</h2>
+                <form id="todo-form">
+                    <input type="hidden" id="task-id">
+                    <div class="form-group">
+                        <label for="title">Назва</label>
+                        <input type="text" id="title" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="description">Опис</label>
+                        <textarea id="description" rows="2"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="priority">Пріоритет</label>
+                        <select id="priority">
+                            <option value="low">Низький</option>
+                            <option value="medium" selected>Середній</option>
+                            <option value="high">Високий</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="dueDate">Термін виконання</label>
+                        <input type="date" id="dueDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="tags">Теги (через кому)</label>
+                        <input type="text" id="tags" placeholder="навчання, js">
+                        <div style="margin-top: 8px;"><small style="font-weight: bold; color: #555;">Швидке додавання тегу:</small></div>
+                        <div id="existing-tags" style="margin-top: 5px; display: flex; gap: 5px; flex-wrap: wrap;"></div>
+                    </div>
+                    <button type="submit" id="btn-submit">Зберегти</button>
+                    <button type="button" id="btn-cancel" style="display:none; background-color: #95a5a6;">Скасувати</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="right-column">
+            <div class="filter-panel">
+                <h2>Фільтрація та пошук</h2>
+                <div class="filter-group">
+                    <label>Статус задачі:</label>
+                    <div class="filter-buttons">
+                        <button class="btn-filter active" data-filter="all">Всі задачи</button>
+                        <button class="btn-filter" data-filter="pending">В черзі</button>
+                        <button class="btn-filter" data-filter="completed">Виконані</button>
+                        <button class="btn-filter" data-filter="overdue">Протерміновані</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="filter-priority">Фільтр за пріоритетом:</label>
+                    <select id="filter-priority">
+                        <option value="all">Всі пріоритети</option>
+                        <option value="low">Низький</option>
+                        <option value="medium">Середній</option>
+                        <option value="high">Високий</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="search-input">Контекстний пошук (назва/опис):</label>
+                    <input type="text" id="search-input" placeholder="Введіть текст для пошуку">
+                </div>
+                <div class="form-group">
+                    <label>Фільтр за тегом (клік для вибору):</label>
+                    <div id="filter-tags-cloud" style="margin-top: 5px; display: flex; gap: 5px; flex-wrap: wrap;"></div>
+                </div>
+            </div>
+
+            <div class="task-list">
+                <h2>Список задач</h2>
+                <div id="tasks-container"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import { TaskManager } from "./taskManager.js";
+
+    const manager = new TaskManager();
+    let currentStatusFilter = "all";
+    let currentTagFilter = "";
+
+    const today = new Date().toISOString().split("T")[0];
+    document.getElementById("dueDate").min = today;
+
+    const form = document.getElementById("todo-form");
+    const tasksContainer = document.getElementById("tasks-container");
+    const formTitle = document.getElementById("form-title");
+    const btnSubmit = document.getElementById("btn-submit");
+    const btnCancel = document.getElementById("btn-cancel");
+
+    function render() {
+        const stats = manager.getStats();
+        document.getElementById("stat-total").textContent = stats.total;
+        document.getElementById("stat-completed").textContent = stats.completed;
+        document.getElementById("stat-pending").textContent = stats.pending;
+        document.getElementById("stat-overdue").textContent = stats.overdue;
+        document.getElementById("stat-rate").textContent = manager.getCompletionRate();
+
+        let filteredTasks = [...manager.tasks];
+
+        if (currentStatusFilter === "pending") {
+            filteredTasks = manager.getTasksByStatus("pending");
+        } else if (currentStatusFilter === "completed") {
+            filteredTasks = manager.getTasksByStatus("completed");
+        } else if (currentStatusFilter === "overdue") {
+            filteredTasks = manager.getOverdueTasks();
+        }
+
+        const priorityVal = document.getElementById("filter-priority").value;
+        if (priorityVal !== "all") {
+            filteredTasks = filteredTasks.filter(t => t.priority === priorityVal);
+        }
+
+        const searchVal = document.getElementById("search-input").value.trim();
+        if (searchVal) {
+            const lower = searchVal.toLowerCase();
+            filteredTasks = filteredTasks.filter(t =>
+                t.title.toLowerCase().includes(lower) ||
+                t.description.toLowerCase().includes(lower)
+            );
+        }
+
+        // Фільтрація списку за обраним у хмарі тегом
+        if (currentTagFilter) {
+            filteredTasks = filteredTasks.filter(t => t.tags.includes(currentTagFilter));
+        }
+
+        tasksContainer.innerHTML = "";
+        if (filteredTasks.length === 0) {
+            tasksContainer.innerHTML = "<p style='color: #7f8c8d;'>Задач за вказаними фільтрами не знайдено</p>";
+        } else {
+            filteredTasks.forEach(task => {
+                const item = document.createElement("div");
+                item.className = `task-item ${task.status === "completed" ? "completed" : ""} ${task.isOverdue ? "overdue" : ""}`;
+
+                const dateStr = task.dueDate.toISOString().split("T")[0];
+
+                item.innerHTML = `
+                    <div>
+                        <strong>${task.title}</strong> [Пріоритет: ${task.priority}]<br>
+                        <span style="font-size: 14px;">${task.description}</span><br>
+                        <small>Дедлайн: ${dateStr} ${task.isOverdue ? "<strong>(Протерміновано)</strong>" : ""}</small><br>
+                        <small>Теги: ${task.tags.join(", ") || "-"}</small>
+                    </div>
+                    <div class="task-actions">
+                        ${task.status !== "completed" ? `<button class="btn-complete" data-id="${task.id}">Виконано</button>` : ""}
+                        <button class="btn-edit" data-id="${task.id}" style="background-color: #f39c12;">Змінити</button>
+                        <button class="btn-delete" data-id="${task.id}">Видалити</button>
+                    </div>
+                `;
+                tasksContainer.appendChild(item);
+            });
+        }
+
+        // Збір усіх унікальних тегів, які зараз є в системі
+        const allUniqueTags = [];
+        manager.tasks.forEach(t => {
+            t.tags.forEach(tag => {
+                if (!allUniqueTags.includes(tag)) {
+                    allUniqueTags.push(tag);
+                }
+            });
+        });
+
+        // 1. Рендеринг хмари тегів для форми створення задачі (ліва колонка)
+        const formTagsContainer = document.getElementById("existing-tags");
+        formTagsContainer.innerHTML = "";
+        if (allUniqueTags.length === 0) {
+            formTagsContainer.innerHTML = "<small style='color: #7f8c8d;'>Немає створених тегів</small>";
+        } else {
+            allUniqueTags.forEach(tag => {
+                const badge = document.createElement("span");
+                badge.textContent = tag;
+                badge.style.cssText = "background: #eef2f5; padding: 4px 8px; border-radius: 4px; font-size: 12px; cursor: pointer; border: 1px solid #ccc; user-select: none;";
+                badge.addEventListener("click", () => {
+                    const tagsInput = document.getElementById("tags");
+                    let currentTags = tagsInput.value.split(",").map(t => t.trim()).filter(t => t !== "");
+                    if (!currentTags.includes(tag)) {
+                        currentTags.push(tag);
+                        tagsInput.value = currentTags.join(", ");
+                    }
+                });
+                formTagsContainer.appendChild(badge);
+            });
+        }
+
+        // 2. Рендеринг хмари тегів для панелі фільтрації (права колонка)
+        const filterTagsContainer = document.getElementById("filter-tags-cloud");
+        filterTagsContainer.innerHTML = "";
+        if (allUniqueTags.length === 0) {
+            filterTagsContainer.innerHTML = "<small style='color: #7f8c8d;'>Немає створених тегів</small>";
+        } else {
+            allUniqueTags.forEach(tag => {
+                const badge = document.createElement("span");
+                badge.textContent = tag;
+
+                if (tag === currentTagFilter) {
+                    badge.style.cssText = "background: #2c3e50; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; cursor: pointer; border: 1px solid #2c3e50; user-select: none; font-weight: bold;";
+                } else {
+                    badge.style.cssText = "background: #eef2f5; color: #333; padding: 4px 8px; border-radius: 4px; font-size: 12px; cursor: pointer; border: 1px solid #ccc; user-select: none;";
+                }
+
+                badge.addEventListener("click", () => {
+                    if (currentTagFilter === tag) {
+                        currentTagFilter = "";
+                    } else {
+                        currentTagFilter = tag;
+                    }
+                    render();
+                });
+                filterTagsContainer.appendChild(badge);
+            });
+        }
+    }
+
+    form.addEventListener("submit", (e) => {
+        e.preventDefault();
+
+        const idVal = document.getElementById("task-id").value;
+        const title = document.getElementById("title").value;
+        const description = document.getElementById("description").value;
+        const priority = document.getElementById("priority").value;
+        const dueDate = document.getElementById("dueDate").value;
+        const tagsInput = document.getElementById("tags").value;
+
+        const tags = tagsInput ? tagsInput.split(",").map(t => t.trim()).filter(t => t !== "") : [];
+
+        if (idVal) {
+            manager.updateTask(Number(idVal), { title, description, priority, dueDate, tags });
+            resetForm();
+        } else {
+            manager.createTask({
+                id: Date.now(),
+                title,
+                description,
+                priority,
+                dueDate,
+                tags
+            });
+            form.reset();
+        }
+        render();
+    });
+
+    // Перевірка взаємодії кнопок з CRUD
+    tasksContainer.addEventListener("click", (e) => {
+        const id = Number(e.target.dataset.id);
+        if (!id) return;
+
+        if (e.target.classList.contains("btn-complete")) {
+            const task = manager.tasks.find(t => t.id === id);
+            if (task) task.markComplete();
+            render();
+        } else if (e.target.classList.contains("btn-delete")) {
+            manager.deleteTask(id);
+            render();
+        } else if (e.target.classList.contains("btn-edit")) {
+            const task = manager.tasks.find(t => t.id === id);
+            if (task) {
+                document.getElementById("dueDate").min = "";
+
+                document.getElementById("task-id").value = task.id;
+                document.getElementById("title").value = task.title;
+                document.getElementById("description").value = task.description;
+                document.getElementById("priority").value = task.priority;
+                document.getElementById("dueDate").value = task.dueDate.toISOString().split("T")[0];
+                document.getElementById("tags").value = task.tags.join(", ");
+
+                formTitle.textContent = "Редагувати задачу";
+                btnSubmit.textContent = "Зберегти зміни";
+                btnCancel.style.display = "inline-block";
+            }
+        }
+    });
+
+    document.querySelectorAll(".btn-filter").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+            document.querySelectorAll(".btn-filter").forEach(b => b.classList.remove("active"));
+            e.target.classList.add("active");
+            currentStatusFilter = e.target.dataset.filter;
+            render();
+        });
+    });
+
+    document.getElementById("filter-priority").addEventListener("change", render);
+    document.getElementById("search-input").addEventListener("input", render);
+
+    btnCancel.addEventListener("click", resetForm);
+
+    function resetForm() {
+        form.reset();
+        document.getElementById("task-id").value = "";
+        document.getElementById("dueDate").min = today;
+        formTitle.textContent = "Створити задачу";
+        btnSubmit.textContent = "Зберегти";
+        btnCancel.style.display = "none";
+
+        currentStatusFilter = "all";
+        currentTagFilter = "";
+        document.getElementById("filter-priority").value = "all";
+        document.getElementById("search-input").value = "";
+
+        document.querySelectorAll(".btn-filter").forEach(b => b.classList.remove("active"));
+        const allBtn = document.querySelector(".btn-filter[data-filter='all']");
+        if (allBtn) {
+            allBtn.classList.add("active");
+        }
+    }
+
+    manager.createTask({
+        id: 101,
+        title: "Здати практичну роботу з JS",
+        description: "Записати відео демки та завантажити код",
+        priority: "high",
+        dueDate: "2026-05-30",
+        tags: ["навчання", "коледж"]
+    });
+
+    manager.createTask({
+        id: 102,
+        title: "Вечеря",
+        description: "Приготувати вечерю",
+        priority: "medium",
+        dueDate: "2026-05-20",
+        tags: ["побут"]
+    });
+
+    render();
+</script>
+
+</body>
+</html>
