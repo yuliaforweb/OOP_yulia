@@ -1,0 +1,30 @@
+# Залежності та сторонні пакети
+node_modules/
+jspm_packages/
+web_modules/
+
+# Логи та звіти про помилки
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Кеш та налаштування середовища розробки CLion / JetBrains
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Конфігурація операційної системи
+.DS_Store
+Thumbs.db
+
+# Тимчасові файли та звіти покриття тестів
+.coverage
+.nyc_output
+htmlcov/
