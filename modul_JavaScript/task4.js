@@ -1,4 +1,4 @@
-Клас для однієї задачі
+// Клас для однієї задачі
 class Task {
     constructor(id, text) {
         this.id = id;
