@@ -40,11 +40,9 @@ static int calculateDaysInternal(const string& checkIn, const string& checkOut) 
 }
 
 HotelSystem::HotelSystem() {
-    // конструктор об'єкта системи готелю
 }
 
 void HotelSystem::loadData() {
-    // початкове завантаження структур за потреби
 }
 
 string HotelSystem::getAvailableRoomsStr(const string& checkIn, const string& checkOut) {
@@ -161,7 +159,7 @@ bool HotelSystem::updateBookingData(int bookingId, const string& name, const str
     const char* conninfo = "host=127.0.0.1 port=5432 dbname=hotel_db user=postgres password=root";
     PGconn* conn = PQconnectdb(conninfo);
     if (PQstatus(conn) != CONNECTION_OK) {
-        Logger::error("Збій підключення до бази під час оновлення картки");
+        Logger::error("Збій підключення до базы під час оновлення картки");
         PQfinish(conn);
         return false;
     }
@@ -253,13 +251,13 @@ string HotelSystem::getReservationsStr(const string& passportFilter) {
                 {"fullname", PQgetvalue(res, i, 1)},
                 {"phone", PQgetvalue(res, i, 2)},
                 {"passport", PQgetvalue(res, i, 3)},
-                {"room_number", atoi(PQgetvalue(res, i, 4))},
+                {"room", atoi(PQgetvalue(res, i, 4))},
                 {"checkin", PQgetvalue(res, i, 5)},
                 {"checkout", PQgetvalue(res, i, 6)},
-                {"status", PQgetvalue(res, i, 7)},
-                {"payment_status", PQgetvalue(res, i, 8)},
+                {"total_pay", atof(PQgetvalue(res, i, 7))},
+                {"status", PQgetvalue(res, i, 8)},
                 {"payment_method", PQgetvalue(res, i, 9)},
-                {"total_pay", atof(PQgetvalue(res, i, 10))}
+                {"payment_status", PQgetvalue(res, i, 10)}
             });
         }
     }
@@ -290,7 +288,7 @@ json HotelSystem::getBookingJsonByPassport(const string& passport) {
 
                 jArr.push_back({
                     {"id", atoi(PQgetvalue(res, i, 0))},
-                    {"room_number", atoi(PQgetvalue(res, i, 1))},
+                    {"room", atoi(PQgetvalue(res, i, 1))},
                     {"room_desc", PQgetvalue(res, i, 2)},
                     {"period", string(PQgetvalue(res, i, 3)) + " - " + PQgetvalue(res, i, 4)},
                     {"status_text", statusText},
@@ -387,7 +385,6 @@ bool HotelSystem::exportPaymentsToExcel(const string& filename) {
         return false;
     }
 
-    // ВИПРАВЛЕНО: Рядок SQL-запиту об'єднано без розривів
     string query = "SELECT b.roomnumber, g.fullname, b.totalcost, CASE WHEN TRIM(b.payment_method) = 'cash' THEN 'Готівка' ELSE 'Онлайн' END, b.checkin FROM bookings b JOIN guests g ON b.guestid = g.id WHERE b.payment_status = 'paid' AND b.status != 'CANCELLED' ORDER BY b.id;";
 
     PGresult* res = PQexec(conn, query.c_str());
@@ -412,7 +409,7 @@ bool HotelSystem::exportPaymentsToExcel(const string& filename) {
     html << "tr:nth-child(even) { background-color: #f9f9f9; }</style></head><body>";
     html << "<h2>Фінансовий звіт інформаційної системи комплексу \"Готель\"</h2>";
     html << "<h3>Реєстр проведених та закритих оплат персоналом:</h3>";
-    html << "<table><tr><th>Номер номера</th><th>ПІБ гостя</th><th>Сума оплати</th><th>Спосіб оплати</th><th>Дата оплати</th></tr>";
+    html << "<table><tr><th>Номер</th><th>ПІБ гостя</th><th>Сума оплати</th><th>Спосіб оплати</th><th>Дата оплати</th></tr>";
 
     int rows = PQntuples(res);
     for (int i = 0; i < rows; i++) {

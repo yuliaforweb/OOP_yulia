@@ -7,11 +7,11 @@
 #include <vector>
 #include <chrono>
 #include <fstream>
+#include <algorithm>
 
 using namespace std;
 using json = nlohmann::json;
 
-// виділення пам'яті під усі глобальні змінні інтерфейсу оператора
 bool isRequestProcessing = false;
 string loginResponse = "";
 string fundResponse = "";
@@ -74,18 +74,17 @@ void exportReportToHtml(const string& data, int mode) {
             for (auto& item : arr) {
                 f << "<tr><td>" << item.value("room", 0) << "</td><td>" << item.value("desc", "-") << "</td><td>" << item.value("state", "-") << "</td></tr>";
             }
-        } catch (const exception& parseEx) {
-            f << "<tr><td colspan='3'>Помилка обробки箋структури даних</td></tr>";
+        } catch (...) {
+            f << "<tr><td colspan='3'>Помилка обробки структури даних</td></tr>";
         }
         f << "</table>";
     } else {
-        f << "<h3>Финансовий аналіз закритих ордерів (тільки проведені оплати)</h3>";
+        f << "<h3>Фінансовий аналіз закритих ордерів (тільки проведені оплати)</h3>";
         try {
             json obj = json::parse(data);
             f << "<p><b>Загальний чистий дохід комплексу:</b> " << obj.value("total_income", 0.0) << " грн</p>";
-            f << "<p><b>Кількість закритих у базі ордерів:</b> " << obj.value("total_count", 0) << " од.</p>";
-        } catch (const exception& parseEx) {
-            f << "<p>Помилка обробки фінансових обєктів</p>";
+        } catch (...) {
+            f << "<p>Помилка обробки фінансових об'єктів</p>";
         }
     }
     f << "<script>window.print();</script></body></html>";
@@ -192,7 +191,7 @@ void sendJsonRequest(json req) {
             if (cmd == "LOGIN") loginResponse = "Спроба підключення до сервера: " + to_string(attempt) + " з " + to_string(maxAttempts);
             reply = sendPostRequest(req.dump());
             success = true; break;
-        } catch (const exception& connectError) {
+        } catch (...) {
             if (attempt < maxAttempts) this_thread::sleep_for(chrono::seconds(1));
         }
     }
@@ -225,10 +224,10 @@ void sendJsonRequest(json req) {
             }
         }
         else if (cmd == "CHANGE_PASSWORD") passwordResponse = replyJson.value("message", "Збій");
-        else if (cmd == "CREATE_BOOKING" || cmd == "CONFIRM_BOOKING" || cmd == "CANCEL_BOOKING" || cmd == "PROCESS_RECEPTION_PAYMENT") {
+        else if (cmd == "CREATE_BOOKING" || cmd == "CONFIRM_BOOKING" || cmd == "CANCEL_BOOKING" || cmd == "PROCESS_PAYMENT" || cmd == "UPDATE_BOOKING_DATA") {
             bookingResponse = replyJson.value("message", "Збій");
             if (replyJson.value("status", "") == "OK") {
-                json refReq = { {"command", "SHOW_RESERVATIONS"}, {"passport", string(bufSearchPassport)} };
+                json refReq = { {"command", "SHOW_RESERVATIONS"}, {"passport_filter", string(bufSearchPassport)} };
                 try {
                     string refReply = sendPostRequest(refReq.dump());
                     json refJson = json::parse(refReply);
@@ -242,7 +241,7 @@ void sendJsonRequest(json req) {
         else if (cmd == "SHOW_GUESTS") { if (replyJson.contains("arr") && replyJson["arr"].is_array()) guestsArray = replyJson["arr"]; }
         else if (cmd == "REPORT_OCCUPANCY") { if (replyJson.contains("arr") && replyJson["arr"].is_array()) occupancyArray = replyJson["arr"]; }
         else if (cmd == "REPORT_FINANCIAL") { if (replyJson.contains("data") && replyJson["data"].is_object()) financialData = replyJson["data"]; }
-    } catch (const exception& parseError) {
+    } catch (...) {
         loginResponse = "Помилка: Невірний формат відповіді шлюзу";
     }
     isRequestProcessing = false;
@@ -341,7 +340,6 @@ void drawMainUI(ImGuiIO& io, ImGuiWindowFlags flags) {
                 activeTabTracker = 2;
                 programmaticJumpTab = -1;
 
-                // ВБУДОВАНИЙ ВНУТРІШНІЙ ТАБ-БАР ДЛЯ РОЗДІЛЕННЯ ЕКРАНА НА ДВІ ЧАСТИНИ
                 if (userRoleGlobalIdx == 3 || userRoleGlobalIdx == 1) {
                     if (ImGui::BeginTabBar("SubManageTabs", ImGuiTabBarFlags_None)) {
                         if (ImGui::BeginTabItem("Журнал замовлень та редагування")) {

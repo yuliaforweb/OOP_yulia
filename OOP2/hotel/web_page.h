@@ -8,263 +8,272 @@ const std::string GUEST_WEB_PAGE = R"html(
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Інформаційна система Готель</title>
+    <title>Інформаційна система "Готель"</title>
     <style>
-        body { font-family: sans-serif; background: #f0f2f5; padding: 20px; }
-        .container { max-width: 600px; background: white; padding: 25px; margin: 0 auto; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .tabs { display: flex; margin-bottom: 20px; border-bottom: 2px solid #ccc; }
-        .tab { padding: 10px 20px; cursor: pointer; border: none; background: none; font-size: 16px; width: auto; margin: 0; color: #333; }
-        .tab.active { border-bottom: 3px solid #1a73e8; color: #1a73e8; font-weight: bold; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        h1 { color: #1a73e8; margin-top: 0; text-align: center; font-size: 28px; }
+        .tabs { display: flex; border-bottom: 2px solid #ddd; margin-bottom: 25px; justify-content: center; }
+        .tab { padding: 12px 25px; cursor: pointer; font-weight: 600; color: #666; border-bottom: 3px solid transparent; transition: all 0.2s; }
+        .tab.active { color: #1a73e8; border-bottom-color: #1a73e8; }
         .content { display: none; }
         .content.active { display: block; }
-        input, select { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        .content button { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; background: #1a73e8; color: white; border: none; cursor: pointer; font-size: 16px; }
-        .content button.cancel-btn { background: #d93025; margin-top: 10px; }
-        .error { color: #d93025; margin: 5px 0; font-weight: bold; }
-        .success { color: #1e8e3e; margin: 5px 0; font-weight: bold; }
-        .booking-card { border: 1px solid #ddd; padding: 15px; margin-top: 15px; border-radius: 6px; background: #fafafa; }
-
-        /* Стилі для блоку вибору оплати */
-        .payment-block { margin: 15px 0; padding: 12px; border: 1px dashed #ccc; border-radius: 6px; background: #fdfdfd; }
-        .payment-block label { font-weight: bold; display: block; margin-bottom: 8px; }
-        .radio-group { display: flex; gap: 20px; align-items: center; margin: 5px 0; }
-        .radio-group label { font-weight: normal; display: inline; cursor: pointer; margin: 0; }
-        .radio-group input[type="radio"] { width: auto; margin: 0; cursor: pointer; }
+        label { display: block; margin: 12px 0 6px; font-weight: 500; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 15px; }
+        button { width: 100%; padding: 12px; background: #1a73e8; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 18px; transition: background 0.2s; }
+        button:hover { background: #155cb4; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .room-card { border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; background: #fbfbfb; }
+        .room-info h3 { margin: 0 0 5px 0; color: #222; }
+        .room-info p { margin: 0; color: #666; font-size: 14px; }
+        .select-btn { width: auto; padding: 8px 20px; margin: 0; background: #28a745; }
+        .select-btn:hover { background: #218838; }
+        .price-tag { font-weight: bold; color: #28a745; font-size: 18px; margin-top: 10px; text-align: right; }
+        .status-box { border: 1px solid #ddd; padding: 15px; margin-top: 15px; border-radius: 8px; background: #f9f9f9; }
+        .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; color: white; }
+        .badge.active { background: #28a745; }
+        .badge.pending { background: #ffc107; color: #222; }
+        .badge.cancelled { background: #dc3545; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>Інформаційна система "Готель"</h2>
+        <h1>Інформаційна система "Готель"</h1>
         <div class="tabs">
-            <button class="tab active" onclick="switchTab(0)">Вільні номери</button>
-            <button class="tab" onclick="switchTab(1)">Резервування</button>
-            <button class="tab" onclick="switchTab(2)">Перевірка броні</button>
+            <div class="tab active" onclick="switchTab('fund')">Вільні номери</div>
+            <div class="tab" onclick="switchTab('booking')">Резервування</div>
+            <div class="tab" onclick="switchTab('check')">Перевірка броні</div>
         </div>
 
-        <div id="tab0" class="content active">
+        <div id="tab-fund" class="content active">
             <label>Дата заїзду:</label>
-            <input type="date" id="fund_in">
+            <input type="text" id="fund-ci" placeholder="дд.мм.рррр">
             <label>Дата виїзду:</label>
-            <input type="date" id="fund_out">
-            <button onclick="checkFreeRooms()">Знайти вільні номери</button>
-            <div id="fund_result"></div>
+            <input type="text" id="fund-co" placeholder="дд.мм.рррр">
+            <button onclick="searchRooms()">Пошук вільних місць</button>
+            <div id="fund-results" style="margin-top: 20px;"></div>
         </div>
 
-        <div id="tab1" class="content">
-            <input type="text" id="b_ln" placeholder="Прізвище">
-            <input type="text" id="b_fn" placeholder="Ім'я">
-            <input type="text" id="b_mn" placeholder="По батькові">
-            <input type="text" id="b_phone" placeholder="Телефон" maxlength="19">
-            <input type="text" id="b_pass" placeholder="Паспорт">
+        <div id="tab-booking" class="content">
+            <label>ПІБ гостя:</label>
+            <input type="text" id="book-name" placeholder="Введіть повне ПІБ">
+            <label>Телефон:</label>
+            <input type="text" id="book-phone" placeholder="+38 (0XX) XXX-XX-XX">
+            <label>Паспорт:</label>
+            <input type="text" id="book-passport" placeholder="Номер документа (9 цифр або 2 літери + 6 цифр)">
             <label>Дата заїзду:</label>
-            <input type="date" id="b_in">
+            <input type="text" id="book-ci" placeholder="дд.мм.рррр" oninput="updateLivePrice()">
             <label>Дата виїзду:</label>
-            <input type="date" id="b_out">
+            <input type="text" id="book-co" placeholder="дд.мм.рррр" oninput="updateLivePrice()">
             <label>Категорія номеру для проживання:</label>
-            <select id="b_cat">
-                <option value="1">Стандартний 2-місний (800 грн)</option>
-                <option value="2">Стандартний 3-місний (900 грн)</option>
-                <option value="3">Делюкс 2-місний з балконом (1500 грн)</option>
-                <option value="4">Делюкс 3-місний без балкона (1500 грн)</option>
-                <option value="5">Люкс 4-місний (джакузі, 2 кімнати) (3500 грн)</option>
-                <option value="6">Люкс 6-місний (джакузі, 3 кімнати) (4200 грн)</option>
+            <select id="book-cat" onchange="updateLivePrice()">
+                <option value="1" data-price="800">Стандартний 2-місний (800 грн/доба)</option>
+                <option value="2" data-price="900">Стандартний 3-місний (900 грн/доба)</option>
+                <option value="3" data-price="1500">Делюкс 2-місний з балконом (1500 грн/доба)</option>
+                <option value="4" data-price="1500">Делюкс 3-місний без балкона (1500 грн/доба)</option>
+                <option value="5" data-price="3500">Люкс 4-місний (джакузі, 2 кімнати) (3500 грн/доба)</option>
+                <option value="6" data-price="4200">Люкс 6-місний (джакузі, 3 кімнати) (4200 грн/доба)</option>
             </select>
-
-            <div class="payment-block">
-                <label>Оберіть варіант оплати:</label>
-                <div class="radio-group">
-                    <input type="radio" id="pay_online" name="web_payment" value="online" checked>
-                    <label for="pay_online">Оплатити зараз онлайн (Імітація)</label>
-                </div>
-                <div class="radio-group">
-                    <input type="radio" id="pay_reception" name="web_payment" value="upon_check_in">
-                    <label for="pay_reception">Оплатити пізніше при заселенні</label>
-                </div>
-            </div>
-
-            <button onclick="createWebBooking()">Забронювати номер</button>
-            <div id="booking_result"></div>
+            <div id="live-price" class="price-tag">Разом до сплати: 0.00 грн</div>
+            <button id="submit-booking-btn" onclick="submitBooking()">Надіслати заявку на резерв</button>
+            <div id="booking-msg" style="margin-top: 15px; font-weight: bold; text-align: center;"></div>
         </div>
 
-        <div id="tab2" class="content">
-            <input type="text" id="search_pass" placeholder="Введіть номер паспорта">
-            <button onclick="checkGuestStatus()">Перевірити статус замовлення</button>
-            <div id="status_result"></div>
+        <div id="tab-check" class="content">
+            <label>Введіть номер паспорта:</label>
+            <input type="text" id="check-passport" placeholder="Номер документа">
+            <button onclick="checkBookingStatus()">Перевірити статус замовлення</button>
+            <div id="check-results" style="margin-top: 20px;"></div>
         </div>
     </div>
 
     <script>
-        document.getElementById('b_phone').addEventListener('input', function (e) {
-            let x = e.target.value.replace(/\D/g, '');
-            if (x.startsWith('380')) {
-                x = x.substr(3);
-            } else if (x.startsWith('0')) {
-                x = x.substr(1);
-            }
-            if (x.length > 9) x = x.substr(0, 9);
-
-            let res = "+38 (0";
-            if (x.length > 0) res += x.substr(0, 2);
-            if (x.length > 2) res += ") " + x.substr(2, 3);
-            if (x.length > 5) res += "-" + x.substr(5, 2);
-            if (x.length > 7) res += "-" + x.substr(7);
-
-            if (x.length === 0) res = "";
-            e.target.value = res;
-        });
-
-        function switchTab(idx) {
-            let tabs = document.querySelectorAll('.tab');
-            let contents = document.querySelectorAll('.content');
-            tabs.forEach((t, i) => t.classList.toggle('active', i === idx));
-            contents.forEach((c, i) => c.classList.toggle('active', i === idx));
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById('tab-' + tabId).classList.add('active');
         }
 
-        function formatDate(isoDate) {
-            if (!isoDate) return "";
-            let parts = isoDate.split('-');
-            if (parts.length !== 3) return isoDate;
-            return parts[2] + '.' + parts[1] + '.' + parts[0];
-        }
-
-        function checkFreeRooms() {
-            let i = document.getElementById('fund_in').value;
-            let o = document.getElementById('fund_out').value;
-            let res = document.getElementById('fund_result');
-            res.innerHTML = "";
-            if (!i || !o) {
-                res.innerHTML = '<p class="error">Помилка: Заповніть дати заїзду та виїзду!</p>';
-                return;
-            }
-            if (i >= o) {
-                res.innerHTML = '<p class="error">Помилка: Дата заїзду не може бути рівною або пізнішою за дату виїзду!</p>';
-                return;
-            }
-
-            fetch('/api', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ command: 'CHECK_FREE_ROOMS', check_in: formatDate(i), check_out: formatDate(o) })
-            })
-            .then(r => r.json())
-            .then(data => {
-                let html = '<h3>Доступні варіанти:</h3>';
-                data.rooms.forEach(r => {
-                    html += '<p>' + r.desc + ' - ' + r.available_count + ' ном. (' + r.price + ' грн)</p>';
+        // Застосування масок введення
+        function setupMasks() {
+            const dateInputs = ['fund-ci', 'fund-co', 'book-ci', 'book-co'];
+            dateInputs.forEach(id => {
+                document.getElementById(id).addEventListener('input', function(e) {
+                    let v = e.target.value.replace(/\D/g, '');
+                    if (v.length > 8) v = v.substr(0, 8);
+                    let res = '';
+                    if (v.length > 0) res += v.substr(0, 2);
+                    if (v.length > 2) res += '.' + v.substr(2, 2);
+                    if (v.length > 4) res += '.' + v.substr(4, 4);
+                    e.target.value = res;
                 });
-                res.innerHTML = html;
+            });
+
+            document.getElementById('book-phone').addEventListener('input', function(e) {
+                let v = e.target.value.replace(/\D/g, '');
+                if (v.startsWith('380')) v = v.substr(3);
+                if (v.length > 9) v = v.substr(0, 9);
+                let res = '+38 (0' + v.substr(0, 2);
+                if (v.length > 2) res += ') ' + v.substr(2, 3);
+                if (v.length > 5) res += '-' + v.substr(5, 2);
+                if (v.length > 7) res += '-' + v.substr(7, 2);
+                e.target.value = res;
+            });
+
+            document.getElementById('book-passport').addEventListener('input', function(e) {
+                let v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                if (v.length > 9) v = v.substr(0, 9);
+                e.target.value = v;
             });
         }
 
-        function createWebBooking() {
-            let ln = document.getElementById('b_ln').value;
-            let fn = document.getElementById('b_fn').value;
-            let mn = document.getElementById('b_mn').value;
-            let ph = document.getElementById('b_phone').value;
-            let ps = document.getElementById('b_pass').value;
-            let i = document.getElementById('b_in').value;
-            let o = document.getElementById('b_out').value;
-            let cat = document.getElementById('b_cat').value;
+        function calculateDays(ci, co) {
+            if (ci.length !== 10 || co.length !== 10) return 0;
+            let parts1 = ci.split('.'), parts2 = co.split('.');
+            let d1 = new Date(parts1[2], parts1[1]-1, parts1[0]);
+            let d2 = new Date(parts2[2], parts2[1]-1, parts2[0]);
+            let diff = d2 - d1;
+            return diff > 0 ? Math.ceil(diff / (1000 * 60 * 60 * 24)) : 0;
+        }
 
-            // Зчитуємо обрану радіокнопку платіжного методу
-            let payMethod = document.querySelector('input[name="web_payment"]:checked').value;
+        function updateLivePrice() {
+            let ci = document.getElementById('book-ci').value;
+            let co = document.getElementById('book-co').value;
+            let days = calculateDays(ci, co);
+            let select = document.getElementById('book-cat');
+            let price = parseFloat(select.options[select.selectedIndex].getAttribute('data-price'));
+            let total = days * price;
+            document.getElementById('live-price').innerText = "Разом до сплати: " + total.toFixed(2) + " грн (" + days + " діб)";
+        }
 
-            let res = document.getElementById('booking_result');
-            res.innerHTML = "";
-
-            if (!ln || !fn || !mn || !ph || !ps || !i || !o) {
-                res.innerHTML = '<p class="error">Помилка: Усі поля обов\'язкові до заповнення!</p>';
-                return;
-            }
-            if (i >= o) {
-                res.innerHTML = '<p class="error">Помилка: Дата заїзду не може бути рівною або пізнішою за дату виїзду!</p>';
-                return;
-            }
-
-            const roomMap = { "1": 101, "2": 103, "3": 201, "4": 202, "5": 301, "6": 302 };
-            let simulatedRoom = roomMap[cat] || 101;
+        function searchRooms() {
+            let ci = document.getElementById('fund-ci').value;
+            let co = document.getElementById('fund-co').value;
+            if (!ci || !co) { alert('Будь ласка, вкажіть дати!'); return; }
 
             fetch('/api', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ command: 'CHECK_FREE_ROOMS', check_in: ci, check_out: co })
+            })
+            .then(r => r.json())
+            .then(data => {
+                let html = '';
+                if (data.status === 'OK' && data.rooms) {
+                    data.rooms.forEach(r => {
+                        let isFull = r.available_count <= 0;
+                        html += `<div class="room-card">
+                            <div class="room-info">
+                                <h3>${r.desc}</h3>
+                                <p>Ціна: <b>${r.price} грн/доба</b> | Доступно: ${r.available_count} ном.</p>
+                            </div>
+                            <button class="select-btn" ${isFull ? 'disabled' : ''} onclick="selectRoomForGuest('${ci}', '${co}', ${r.id})">
+                                ${isFull ? 'Зайнято' : 'Обрати'}
+                            </button>
+                        </div>`;
+                    });
+                }
+                document.getElementById('fund-results').innerHTML = html;
+            });
+        }
+
+        function selectRoomForGuest(ci, co, catId) {
+            document.getElementById('book-ci').value = ci;
+            document.getElementById('book-co').value = co;
+            document.getElementById('book-cat').value = catId;
+            updateLivePrice();
+            switchTab('booking');
+        }
+
+        function submitBooking() {
+            let name = document.getElementById('book-name').value;
+            let phone = document.getElementById('book-phone').value;
+            let passport = document.getElementById('book-passport').value;
+            let ci = document.getElementById('book-ci').value;
+            let co = document.getElementById('book-co').value;
+            let cat = parseInt(document.getElementById('book-cat').value);
+
+            if (!name || !phone || !passport || !ci || !co) {
+                alert('Усі поля форми є обов\'язковими до заповнення!');
+                return;
+            }
+
+            let roomMap = { 1: 101, 2: 103, 3: 201, 4: 202, 5: 301, 6: 302 };
+
+            fetch('/api', {
+                method: 'POST',
                 body: JSON.stringify({
                     command: 'CREATE_BOOKING',
-                    guest_name: ln + ' ' + fn + ' ' + mn,
-                    phone: ph,
-                    passport: ps,
-                    check_in: formatDate(i),
-                    check_out: formatDate(o),
-                    room_number: simulatedRoom,
-                    payment_method_choice: payMethod // Передаємо вибір у JSON запиті на сервер
+                    guest_name: name,
+                    phone: phone,
+                    passport: passport,
+                    check_in: ci,
+                    check_out: co,
+                    room_number: roomMap[cat],
+                    payment_method_choice: 'upon_check_in'
                 })
             })
             .then(r => r.json())
             .then(data => {
+                let msgBox = document.getElementById('booking-msg');
                 if (data.status === 'OK') {
-                    res.innerHTML = '<p class="success">' + data.message + '</p>';
+                    msgBox.style.color = '#28a745';
+                    msgBox.innerText = data.message;
                 } else {
-                    res.innerHTML = '<p class="error">' + data.message + '</p>';
+                    msgBox.style.color = '#dc3545';
+                    msgBox.innerText = data.message;
                 }
             });
         }
 
-        function checkGuestStatus() {
-            let ps = document.getElementById('search_pass').value;
-            let res = document.getElementById('status_result');
-            res.innerHTML = "";
-            if (!ps) return;
+        function checkBookingStatus() {
+            let pass = document.getElementById('check-passport').value;
+            if (!pass) { alert('Введіть номер паспорта!'); return; }
 
             fetch('/api', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ command: 'GUEST_CHECK_STATUS', passport: ps })
+                body: JSON.stringify({ command: 'GUEST_CHECK_STATUS', passport: pass })
             })
             .then(r => r.json())
             .then(data => {
-                if (!data.bookings || data.bookings.length === 0) {
-                    res.innerHTML = '<p class="error">Бронювань для цього паспорта не знайдено</p>';
-                    return;
+                let html = '';
+                if (data.status === 'OK' && data.bookings && data.bookings.length > 0) {
+                    data.bookings.forEach(b => {
+                        let stClass = b.status_text.includes('Скасовано') ? 'cancelled' : 'active';
+                        html += `<div class="status-box">
+                            <p><b>Ордер №:</b> ${b.id} | <b>Номер фонду:</b> №${b.room}</p>
+                            <p><b>Період проживання:</b> ${b.period}</p>
+                            <p><b>Сума до сплати:</b> ${b.total_pay} грн</p>
+                            <p><b>Статус ордера:</b> <span class="badge ${stClass}">${b.status_text}</span></p>
+                            ${stClass !== 'cancelled' ? `<button style="background:#dc3545; padding:6px; font-size:14px; margin-top:8px;" onclick="cancelWebBooking(${b.id})">Скасувати бронь</button>` : ''}
+                        </div>`;
+                    });
+                } else {
+                    html = '<p style="color:#dc3545; text-align:center;">Активних бронювань за цим документом не знайдено.</p>';
                 }
-                data.bookings.forEach(b => {
-                    let div = document.createElement('div');
-                    div.className = 'booking-card';
-                    let btnHtml = '';
-                    if (b.status_code.trim() === "RESERVED") {
-                        btnHtml = '<button class="cancel-btn" onclick="cancelWebBooking(' + b.id + ')">Скасувати бронювання</button>';
-                    }
-
-                    // Відображення статусу оплати в картці клієнта на сайті
-                    let payStatusText = (b.pay_status === 'paid') ? '<span style="color:#1e8e3e;font-weight:bold;">Оплачено</span>' : '<span style="color:#e67e22;font-weight:bold;">Очікує оплати</span>';
-
-                    div.innerHTML = '<p><b>Замовлення №' + b.id + '</b></p>' +
-                                     '<p>Гість: ' + b.guest_name + '</p>' +
-                                     '<p>Номер: ' + b.room_number + ' (' + b.room_desc + ')</p>' +
-                                     '<p>Період: ' + b.period + '</p>' +
-                                     '<p>Статус: ' + b.status_text + '</p>' +
-                                     '<p>Оплата: ' + payStatusText + '</p>' +
-                                     '<p>Сума: ' + b.total_pay + ' грн</p>' + btnHtml;
-                    res.appendChild(div);
-                });
+                document.getElementById('check-results').innerHTML = html;
             });
         }
 
         function cancelWebBooking(id) {
-            if (navigator.userAgent && confirm("Ви дійсно хочете скасувати це бронювання? Запит потребуватиме підтвердження адміністрацією готелю.")) {
-                fetch('/api', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ command: 'CANCEL_BOOKING', id: id })
-                })
-                .then(r => r.json())
-                .then(data => {
-                    alert(data.message);
-                    checkGuestStatus();
-                });
-            }
+            if (!confirm('Ви дійсно бажаєте скасувати це бронювання?')) return;
+            fetch('/api', {
+                method: 'POST',
+                body: JSON.stringify({ command: 'CANCEL_BOOKING', id: id })
+            })
+            .then(r => r.json())
+            .then(data => {
+                alert(data.message);
+                checkBookingStatus();
+            });
         }
+
+        window.onload = function() {
+            setupMasks();
+        };
     </script>
 </body>
 </html>
 )html";
 
-#endif
+#endif // WEB_PAGE_H

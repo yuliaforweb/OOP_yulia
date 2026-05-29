@@ -7,6 +7,7 @@
 #include <vector>
 #include <cstdio>
 #include <cstring>
+#include <algorithm>
 
 using namespace std;
 using json = nlohmann::json;
@@ -20,6 +21,35 @@ static char editBufIn[11] = "";
 static char editBufOut[11] = "";
 static int guestPaymentChoice = 0;
 
+static bool isLeapYearUI(int year) {
+    return (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
+}
+
+static int calculateExactDaysUI(const string& checkIn, const string& checkOut) {
+    int d1 = 0, m1 = 0, y1 = 0, d2 = 0, m2 = 0, y2 = 0;
+    if (sscanf(checkIn.c_str(), "%d.%d.%d", &d1, &m1, &y1) == 3 &&
+        sscanf(checkOut.c_str(), "%d.%d.%d", &d2, &m2, &y2) == 3) {
+
+        const int daysInMonths[] = { 0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+
+        auto getAbsoluteDays = [&](int d, int m, int y) {
+            int total = d;
+            for (int i = 1; i < m; ++i) {
+                if (i == 2 && isLeapYearUI(y)) total += 29;
+                else total += daysInMonths[i];
+            }
+            total += (y - 2026) * 365;
+            for (int i = 2026; i < y; ++i) {
+                if (isLeapYearUI(i)) total += 1;
+            }
+            return total;
+        };
+
+        return getAbsoluteDays(d2, m2, y2) - getAbsoluteDays(d1, m1, y1);
+    }
+    return 0;
+}
+
 void drawContentRoomFund() {
     ImGui::Dummy(ImVec2(0.0f, 12.0f));
     ImGui::Text("Дата заїзду:"); ImGui::SameLine(); ImGui::PushItemWidth(110.0f);
@@ -28,26 +58,26 @@ void drawContentRoomFund() {
     ImGui::SameLine(); ImGui::Text("  Дата виїзду:"); ImGui::SameLine(); ImGui::PushItemWidth(110.0f);
     ImGui::InputTextWithHint("##no", "дд.мм.рррр", bufFundCheckOut, 11); applyDateMask(bufFundCheckOut); ImGui::PopItemWidth();
 
-    int fd1 = 0, fm1 = 0, fy1 = 0, fd2 = 0, fm2 = 0, fy2 = 0;
-    sscanf(bufFundCheckIn, "%d.%d.%d", &fd1, &fm1, &fy1);
-    sscanf(bufFundCheckOut, "%d.%d.%d", &fd2, &fm2, &fy2);
-    int fundDays = (fd2 + fm2 * 30 + fy2 * 365) - (fd1 + fm1 * 30 + fy1 * 365);
-    bool isFundDateInvalid = (fundDays <= 0 && strlen(bufFundCheckIn) == 10 && strlen(bufFundCheckOut) == 10);
+    int exactDays = calculateExactDaysUI(bufFundCheckIn, bufFundCheckOut);
+
+    int d1 = 0, m1 = 0, y1 = 0;
+    sscanf(bufFundCheckIn, "%d.%d.%d", &d1, &m1, &y1);
+    bool isBeforeToday = (y1 < 2026 || (y1 == 2026 && m1 < 5) || (y1 == 2026 && m1 == 5 && d1 < 22));
+
+    bool isFundDateInvalid = (exactDays <= 0 && strlen(bufFundCheckIn) == 10 && strlen(bufFundCheckOut) == 10) || isBeforeToday;
 
     ImGui::SameLine();
+    if (isFundDateInvalid) ImGui::BeginDisabled();
     if (ImGui::Button("Пошук вільних місць")) {
-        if (isFundDateInvalid) {
-            fundResponse = "Помилка: Дата заїзду не може бути рівною або пізнішою за дату виїзду!";
-        } else {
-            fundResponse = "";
-            json req = { {"command", "CHECK_FREE_ROOMS"}, {"checkin", string(bufFundCheckIn)}, {"checkout", string(bufFundCheckOut)} };
-            thread(sendJsonRequest, req).detach();
-        }
+        fundResponse = "";
+        json req = { {"command", "CHECK_FREE_ROOMS"}, {"check_in", string(bufFundCheckIn)}, {"check_out", string(bufFundCheckOut)} };
+        thread(sendJsonRequest, req).detach();
     }
+    if (isFundDateInvalid) ImGui::EndDisabled();
 
     if (isFundDateInvalid || !fundResponse.empty()) {
         ImGui::Dummy(ImVec2(0.0f, 4.0f));
-        ImGui::TextColored(ImVec4(0.95f, 0.35f, 0.35f, 1.0f), "%s", isFundDateInvalid ? "Помилка: Некоректний діапазон дат для пошуку номерів!" : fundResponse.c_str());
+        ImGui::TextColored(ImVec4(0.95f, 0.35f, 0.35f, 1.0f), "%s", isBeforeToday ? "Помилка: Дата заїзду не може бути раніше поточної дати (22.05.2026)!" : "Помилка: Дата заїзду не може бути рівною або пізнішою за дату виїзду!");
     }
 
     ImGui::Dummy(ImVec2(0.0f, 12.0f));
@@ -103,12 +133,13 @@ void drawContentCreateBooking() {
     ImGui::Text("Категорія номеру для заселення:");
     ImGui::Combo("##chosenCat", &chosenCategoryCombo, categoriesList, 6);
 
-    int d1 = 0, m1 = 0, y1 = 0, d2 = 0, m2 = 0, y2 = 0;
-    sscanf(bufBookingCheckIn, "%d.%d.%d", &d1, &m1, &y1);
-    sscanf(bufBookingCheckOut, "%d.%d.%d", &d2, &m2, &y2);
-    int daysCount = (d2 + m2 * 30 + y2 * 365) - (d1 + m1 * 30 + y1 * 365);
+    int exactBookingDays = calculateExactDaysUI(bufBookingCheckIn, bufBookingCheckOut);
 
-    bool isPeriodInvalid = (daysCount <= 0 && strlen(bufBookingCheckIn) == 10 && strlen(bufBookingCheckOut) == 10);
+    int d1 = 0, m1 = 0, y1 = 0;
+    sscanf(bufBookingCheckIn, "%d.%d.%d", &d1, &m1, &y1);
+    bool isBeforeToday = (y1 < 2026 || (y1 == 2026 && m1 < 5) || (y1 == 2026 && m1 == 5 && d1 < 22));
+
+    bool isPeriodInvalid = (exactBookingDays <= 0 && strlen(bufBookingCheckIn) == 10 && strlen(bufBookingCheckOut) == 10) || isBeforeToday;
     bool datesMatchFund = (strcmp(bufBookingCheckIn, bufFundCheckIn) == 0 && strcmp(bufBookingCheckOut, bufFundCheckOut) == 0);
     bool isCategoryFull = false;
 
@@ -117,13 +148,12 @@ void drawContentCreateBooking() {
     }
 
     if (isPeriodInvalid) {
-        ImGui::TextColored(ImVec4(0.95f, 0.35f, 0.35f, 1.0f), "Помилка: Дата заїзду не може бути рівною або пізнішою за дату виїзду!");
+        ImGui::TextColored(ImVec4(0.95f, 0.35f, 0.35f, 1.0f), "%s", isBeforeToday ? "Помилка: Дата заїзду не може бути раніше поточної дати (22.05.2026)!" : "Помилка: Дата заїзду не може бути рівною або пізнішою за дату виїзду!");
     } else if (isCategoryFull) {
         ImGui::TextColored(ImVec4(0.95f, 0.35f, 0.35f, 1.0f), "Помилка: Усі номери цієї категорії на обрані дати вже зайняті!");
     } else {
-        int finalDays = (daysCount <= 0) ? 1 : daysCount;
-        double finalEstimatedCost = finalDays * pricesList[chosenCategoryCombo];
-        ImGui::TextColored(ImVec4(0.25f, 0.75f, 0.45f, 1.00f), "Розрахункова тривалість: %d діб. Разом до сплати: %.2f грн", finalDays, finalEstimatedCost);
+        double finalEstimatedCost = exactBookingDays * pricesList[chosenCategoryCombo];
+        ImGui::TextColored(ImVec4(0.25f, 0.75f, 0.45f, 1.00f), "Розрахункова тривалість: %d діб. Разом до сплати: %.2f грн", exactBookingDays, finalEstimatedCost);
     }
 
     ImGui::Dummy(ImVec2(0.0f, 6.0f));
@@ -144,7 +174,7 @@ void drawContentCreateBooking() {
         ImGui::Button("Обробка запиту...", ImVec2(280.0f, 46.0f));
         ImGui::EndDisabled();
     } else {
-        if (isCategoryFull) ImGui::BeginDisabled();
+        if (isCategoryFull || isPeriodInvalid) ImGui::BeginDisabled();
 
         if (ImGui::Button("Внести в базу даних готелю", ImVec2(280.0f, 46.0f))) {
             string lName = string(bufBookingLastName); string fName = string(bufBookingFirstName); string mName = string(bufBookingMiddleName);
@@ -160,7 +190,7 @@ void drawContentCreateBooking() {
 
             if (lName.empty() || fName.empty() || mName.empty() || phoneStr.empty() || passportStr.empty() || ciStr.empty() || coStr.empty()) {
                 bookingResponse = "Помилка: Усі без винятку поля форми є обов'язковими до введення!";
-            } else if (daysCount <= 0) {
+            } else if (exactBookingDays <= 0) {
                 bookingResponse = "Помилка: Заборонено бронювання! Дата заїзду повинна передувати даті виїзду.";
             } else if (hasBadSymbols(lName) || hasBadSymbols(fName) || hasBadSymbols(mName)) {
                 bookingResponse = "Помилка: Поля ПІБ містьять заборонені спецсимволи чи цифри!";
@@ -187,7 +217,7 @@ void drawContentCreateBooking() {
                 thread(sendJsonRequest, req).detach();
             }
         }
-        if (isCategoryFull) ImGui::EndDisabled();
+        if (isCategoryFull || isPeriodInvalid) ImGui::EndDisabled();
     }
 }
 
@@ -214,25 +244,35 @@ void drawContentManageReservations() {
         if (!reservationsArray.empty() && reservationsArray.is_array()) {
             for (auto& item : reservationsArray) {
                 if (!item.is_object()) continue;
-                int bId = item.value("id", 0);
+
+                int bId = item.contains("id") && !item["id"].is_null() ? item["id"].get<int>() : 0;
+                string fullname = item.contains("fullname") && !item["fullname"].is_null() ? item["fullname"].get<string>() : "Невідомо";
+                string passport = item.contains("passport") && !item["passport"].is_null() ? item["passport"].get<string>() : "-";
+                string phone = item.contains("phone") && !item["phone"].is_null() ? item["phone"].get<string>() : "-";
+                int room = item.contains("room") && !item["room"].is_null() ? item["room"].get<int>() : 0;
+                string checkin = item.contains("checkin") && !item["checkin"].is_null() ? item["checkin"].get<string>() : "-";
+                string checkout = item.contains("checkout") && !item["checkout"].is_null() ? item["checkout"].get<string>() : "-";
+                double total_pay = item.contains("total_pay") && !item["total_pay"].is_null() ? item["total_pay"].get<double>() : 0.0;
+                string payMethod = item.contains("payment_method") && !item["payment_method"].is_null() ? item["payment_method"].get<string>() : "none";
+                string payStatus = item.contains("payment_status") && !item["payment_status"].is_null() ? item["payment_status"].get<string>() : "pending";
+                string status = item.contains("status") && !item["status"].is_null() ? item["status"].get<string>() : "UNKNOWN";
+
                 ImGui::TableNextRow();
                 ImGui::TableSetColumnIndex(0); ImGui::Text("%d", bId);
-                ImGui::TableSetColumnIndex(1); ImGui::Text("%s", fixApostrophe(item.value("fullname", "Невідомо")).c_str());
-                ImGui::TableSetColumnIndex(2); ImGui::Text("%s", item.value("passport", "-").c_str());
-                ImGui::TableSetColumnIndex(3); ImGui::Text("%s", item.value("phone", "-").c_str());
-                ImGui::TableSetColumnIndex(4); ImGui::Text("%d", item.value("room", 0));
-                ImGui::TableSetColumnIndex(5); ImGui::Text("%s", item.value("checkin", "-").c_str());
-                ImGui::TableSetColumnIndex(6); ImGui::Text("%s", item.value("checkout", "-").c_str());
-                ImGui::TableSetColumnIndex(7); ImGui::Text("%.2f грн", item.value("total_pay", 0.0));
+                ImGui::TableSetColumnIndex(1); ImGui::Text("%s", fixApostrophe(fullname).c_str());
+                ImGui::TableSetColumnIndex(2); ImGui::Text("%s", passport.c_str());
+                ImGui::TableSetColumnIndex(3); ImGui::Text("%s", phone.c_str());
+                ImGui::TableSetColumnIndex(4); ImGui::Text("%d", room);
+                ImGui::TableSetColumnIndex(5); ImGui::Text("%s", checkin.c_str());
+                ImGui::TableSetColumnIndex(6); ImGui::Text("%s", checkout.c_str());
+                ImGui::TableSetColumnIndex(7); ImGui::Text("%.2f грн", total_pay);
 
                 ImGui::TableSetColumnIndex(8);
-                string payMethod = item.value("payment_method", "none");
                 if (payMethod == "online") ImGui::Text("Онлайн");
                 else if (payMethod == "cash") ImGui::Text("Готівка");
                 else ImGui::Text("Не вказано");
 
                 ImGui::TableSetColumnIndex(9);
-                string payStatus = item.value("payment_status", "pending");
                 if (payStatus == "paid") {
                     ImGui::TextColored(ImVec4(0.25f, 0.75f, 0.45f, 1.0f), "Оплачено");
                 } else if (payStatus == "upon_check_in") {
@@ -242,27 +282,30 @@ void drawContentManageReservations() {
                 }
 
                 ImGui::TableSetColumnIndex(10);
-                string status = item.value("status", "UNKNOWN");
+                transform(status.begin(), status.end(), status.begin(), ::toupper);
+
                 string statusText = "Невідомо";
-                if (status == "RESERVED" || status == "reserved") statusText = "Зарезервовано";
-                else if (status == "CONFIRMED" || status == "confirmed") statusText = "Активне";
-                else if (status == "CANCELLED" || status == "cancelled") statusText = "Скасовано";
+                if (status == "RESERVED") statusText = "Зарезервовано";
+                else if (status == "CONFIRMED") statusText = "Активне";
+                else if (status == "CANCELLED") statusText = "Скасовано";
                 ImGui::Text("%s", statusText.c_str());
 
                 ImGui::TableSetColumnIndex(11);
                 ImGui::PushID(bId);
-                if (status != "CANCELLED" && status != "cancelled") {
-                    if (ImGui::Button("Редагувати")) {
-                        editBookingId = bId;
-                        snprintf(editBufName, sizeof(editBufName), "%s", item.value("fullname", "").c_str());
-                        snprintf(editBufPhone, sizeof(editBufPhone), "%s", item.value("phone", "").c_str());
-                        snprintf(editBufPass, sizeof(editBufPass), "%s", item.value("passport", "").c_str());
-                        snprintf(editBufIn, sizeof(editBufIn), "%s", item.value("checkin", "").c_str());
-                        snprintf(editBufOut, sizeof(editBufOut), "%s", item.value("checkout", "").c_str());
-                        openEditModalWindow = true;
+                if (status != "CANCELLED") {
+                    if (userRoleGlobalIdx != 2) {
+                        if (ImGui::Button("Редагувати")) {
+                            editBookingId = bId;
+                            snprintf(editBufName, sizeof(editBufName), "%s", fullname.c_str());
+                            snprintf(editBufPhone, sizeof(editBufPhone), "%s", phone.c_str());
+                            snprintf(editBufPass, sizeof(editBufPass), "%s", passport.c_str());
+                            snprintf(editBufIn, sizeof(editBufIn), "%s", checkin.c_str());
+                            snprintf(editBufOut, sizeof(editBufOut), "%s", checkout.c_str());
+                            openEditModalWindow = true;
+                        }
+                        ImGui::SameLine();
                     }
-                    ImGui::SameLine();
-                    if ((status == "RESERVED" || status == "reserved") && (userRoleGlobalIdx == 1 || userRoleGlobalIdx == 3)) {
+                    if (status == "RESERVED" && (userRoleGlobalIdx == 1 || userRoleGlobalIdx == 3)) {
                         if (ImGui::Button("Підтвердити")) {
                             json req = { {"command", "CONFIRM_BOOKING"}, {"id", bId} };
                             thread(sendJsonRequest, req).detach();
@@ -306,6 +349,7 @@ void drawContentManageReservations() {
         ImGui::EndPopup();
     }
 
+    if (bookingIdToCancel != -1) { openCancelModalWindow = true; }
     if (openCancelModalWindow) { ImGui::OpenPopup("Підтвердження скасування"); openCancelModalWindow = false; }
     if (ImGui::BeginPopupModal("Підтвердження скасування", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::Text("Ви дійсно хочете скасувати це бронювання?");

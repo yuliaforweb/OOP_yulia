@@ -6,6 +6,7 @@
 #include <map>
 #include <cstdio>
 #include <cstring>
+#include <algorithm>
 
 using namespace std;
 using json = nlohmann::json;
@@ -20,9 +21,9 @@ void drawContentGuestsDatabase() {
     }
     ImGui::Dummy(ImVec2(0.0f, 12.0f));
 
-    if (ImGui::BeginTable("GuestsTable", 5, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable)) {
+    if (ImGui::BeginTable("GuestsTable", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable)) {
         ImGui::TableSetupColumn("ID"); ImGui::TableSetupColumn("Повне ім'я (ПІБ)"); ImGui::TableSetupColumn("Телефон");
-        ImGui::TableSetupColumn("Паспорт"); ImGui::TableSetupColumn("Обрані номери");
+        ImGui::TableSetupColumn("Паспорт");
         ImGui::TableHeadersRow();
 
         if (!guestsArray.empty() && guestsArray.is_array()) {
@@ -32,10 +33,6 @@ void drawContentGuestsDatabase() {
                 string pass = item.value("passport", "");
                 if (groupedGuests.find(pass) == groupedGuests.end()) {
                     groupedGuests[pass] = item;
-                    groupedGuests[pass]["rooms_list"] = json::array();
-                }
-                if (item.contains("room") && !item["room"].is_null()) {
-                    groupedGuests[pass]["rooms_list"].push_back(item["room"]);
                 }
             }
 
@@ -46,18 +43,6 @@ void drawContentGuestsDatabase() {
                 ImGui::TableSetColumnIndex(1); ImGui::Text("%s", fixApostrophe(guest.value("fullname", "Невідомо")).c_str());
                 ImGui::TableSetColumnIndex(2); ImGui::Text("%s", guest.value("phone", "-").c_str());
                 ImGui::TableSetColumnIndex(3); ImGui::Text("%s", guest.value("passport", "-").c_str());
-
-                string roomsStr = "";
-                if (guest.contains("rooms_list") && guest["rooms_list"].is_array() && !guest["rooms_list"].empty()) {
-                    for (size_t i = 0; i < guest["rooms_list"].size(); i++) {
-                        if (guest["rooms_list"][i].is_null()) continue;
-                        roomsStr += to_string(guest["rooms_list"][i].get<int>());
-                        if (i < guest["rooms_list"].size() - 1) roomsStr += ", ";
-                    }
-                } else {
-                    roomsStr = "Немає активних";
-                }
-                ImGui::TableSetColumnIndex(4); ImGui::Text("%s", roomsStr.c_str());
             }
         }
         ImGui::EndTable();
@@ -90,6 +75,8 @@ void drawContentActiveReservations() {
                 int bookingId = item.value("id", 0);
                 string payMethod = item.value("payment_method", "none");
                 string payStatus = item.value("payment_status", "pending");
+                string status = item.value("status", "UNKNOWN");
+                transform(status.begin(), status.end(), status.begin(), ::toupper);
 
                 ImGui::TableNextRow();
                 ImGui::TableSetColumnIndex(0); ImGui::Text("%d", bookingId);
@@ -113,7 +100,9 @@ void drawContentActiveReservations() {
                 }
 
                 ImGui::TableSetColumnIndex(7);
-                if (payStatus != "paid") {
+                if (status == "CANCELLED") {
+                    ImGui::TextColored(ImVec4(0.95f, 0.35f, 0.35f, 1.0f), "Скасовано");
+                } else if (payStatus != "paid") {
                     if (selectedReceptionPayMethod.find(bookingId) == selectedReceptionPayMethod.end()) {
                         selectedReceptionPayMethod[bookingId] = 0;
                     }
@@ -164,12 +153,10 @@ void drawContentAnalyticalReports() {
     if (ImGui::Button("Сформувати матрицю завантаженості")) {
         if (string(bufReportStart).empty() || string(bufReportEnd).empty()) {
             reportErrorResponse = "Помилка: Вкажіть проміжок дат для звіту завантаженості!";
-        } else if (isReportDateInvalid) {
-            reportErrorResponse = "Помилка: Некоректні часові межі аналітики!";
         } else {
             reportErrorResponse = "";
             activeReportType = 1;
-            json req = { {"command", "ANALYTICS_OCCUPANCY"}, {"start", string(bufReportStart)}, {"end", string(bufReportEnd)} };
+            json req = { {"command", "REPORT_OCCUPANCY"}, {"start", string(bufReportStart)}, {"end", string(bufReportEnd)} };
             thread(sendJsonRequest, req).detach();
         }
     }
@@ -177,12 +164,10 @@ void drawContentAnalyticalReports() {
     if (ImGui::Button("Финансовий аналіз доходу")) {
         if (string(bufReportStart).empty() || string(bufReportEnd).empty()) {
             reportErrorResponse = "Помилка: Вкажіть проміжок дат для фінансового аналізу!";
-        } else if (isReportDateInvalid) {
-            reportErrorResponse = "Помилка: Некоректні часові межі аналітики!";
         } else {
             reportErrorResponse = "";
             activeReportType = 2;
-            json req = { {"command", "ANALYTICS_FINANCIAL"}, {"start", string(bufReportStart)}, {"end", string(bufReportEnd)} };
+            json req = { {"command", "REPORT_FINANCIAL"}, {"start", string(bufReportStart)}, {"end", string(bufReportEnd)} };
             thread(sendJsonRequest, req).detach();
         }
     }
@@ -239,10 +224,16 @@ void drawContentAnalyticalReports() {
 
     ImGui::Dummy(ImVec2(0.0f, 20.0f));
     if (activeReportType != 0) {
+        bool isReportEmpty = false;
+        if (activeReportType == 1 && occupancyArray.empty()) isReportEmpty = true;
+        if (activeReportType == 2 && (!financialData.contains("list") || financialData["list"].empty())) isReportEmpty = true;
+
+        if (isReportEmpty) ImGui::BeginDisabled();
         if (ImGui::Button("Експорт звіту в веб-браузер (HTML)", ImVec2(260.0f, 40.0f))) {
             json req = { {"command", "EXPORT_PAYMENTS_XLS"} };
             thread(sendJsonRequest, req).detach();
         }
+        if (isReportEmpty) ImGui::EndDisabled();
     }
 }
 
@@ -286,7 +277,7 @@ void drawContentSystemSecurity() {
             passwordResponse = "Помилка: Нові паролі не збігаються між собою!";
         }
         else if (userRoleGlobalIdx == 2 && targetRole == 1) {
-            passwordResponse = "Помилка: Менеджер не має прав змінювати пароль Администратора!";
+            passwordResponse = "Помилка: Менеджер не має прав змінювати пароль Адміністратора!";
         }
         else if (userRoleGlobalIdx == 3 && (targetRole == 1 || targetRole == 2)) {
             passwordResponse = "Помилка: Рецепція не має прав змінювати пароль Менеджера або Адміністратора!";

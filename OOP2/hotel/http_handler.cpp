@@ -57,6 +57,12 @@ void handleHttpGuest(SOCKET clientSocket, HotelSystem& hotel, const std::string&
                     Logger::error("Відмова в доступі: неправильні облікові дані для посади ID " + to_string(roleIdx));
                 }
             }
+            else if (cmd == "GUEST_CHECK_STATUS") {
+                string guestPassport = requestJson.value("passport", "");
+                Logger::info("Отримано веб-запит перевірки статусу броні для паспорта: " + guestPassport);
+                json bData = hotel.getBookingJsonByPassport(guestPassport);
+                replyJson = { {"status", "OK"}, {"bookings", bData}, {"arr", bData} };
+            }
             else if (cmd == "CHANGE_PASSWORD") {
                 int targetRole = requestJson.value("role", 1);
                 int currentRole = requestJson.value("current_role", 1);
@@ -110,7 +116,9 @@ void handleHttpGuest(SOCKET clientSocket, HotelSystem& hotel, const std::string&
                 int booked101 = 0, booked102 = 0, booked103 = 0, booked201 = 0, booked202 = 0, booked301 = 0, booked302 = 0;
 
                 if (PQstatus(conn) == CONNECTION_OK) {
-                    string sql = "SELECT roomnumber FROM bookings WHERE status IN ('RESERVED', 'CONFIRMED', 'reserved', 'confirmed') AND NOT (checkout <= '" + inDate + "' OR checkin >= '" + outDate + "');";
+                    string sql = "SELECT roomnumber FROM bookings WHERE status IN ('RESERVED', 'CONFIRMED') AND "
+                                 "TO_DATE(checkout, 'DD.MM.YYYY') > TO_DATE('" + inDate + "', 'DD.MM.YYYY') AND "
+                                 "TO_DATE(checkin, 'DD.MM.YYYY') < TO_DATE('" + outDate + "', 'DD.MM.YYYY');";
                     PGresult* res = PQexec(conn, sql.c_str());
                     int num = PQntuples(res);
                     for (int i = 0; i < num; i++) {
@@ -163,7 +171,9 @@ void handleHttpGuest(SOCKET clientSocket, HotelSystem& hotel, const std::string&
                 if (conn && PQstatus(conn) == CONNECTION_OK) {
                     for (int room : targetRooms) {
                         string checkSql = "SELECT 1 FROM bookings WHERE roomnumber = " + to_string(room) +
-                                          " AND status IN ('RESERVED', 'CONFIRMED', 'reserved', 'confirmed') AND NOT (checkout <= '" + ci + "' OR checkin >= '" + co + "');";
+                                          " AND status IN ('RESERVED', 'CONFIRMED') AND "
+                                          "TO_DATE(checkout, 'DD.MM.YYYY') > TO_DATE('" + ci + "', 'DD.MM.YYYY') AND "
+                                          "TO_DATE(checkin, 'DD.MM.YYYY') < TO_DATE('" + co + "', 'DD.MM.YYYY');";
                         PGresult* checkRes = PQexec(conn, checkSql.c_str());
                         if (PQresultStatus(checkRes) == PGRES_TUPLES_OK && PQntuples(checkRes) == 0) {
                             finalRoomToBook = room;
@@ -200,12 +210,25 @@ void handleHttpGuest(SOCKET clientSocket, HotelSystem& hotel, const std::string&
 
                 Logger::info("Отримано веб-запит на бронювання від клієнта: " + guest);
 
-                bool ok = hotel.addBookingFromWebExtended(guest, phone, pass, cat, inDate, outDate, payMethod);
-                replyJson = { {"status", ok ? "OK" : "ERROR"}, {"message", ok ? "Бронювання успішно створено" : "Немає вільних номерів на ці дати"} };
+                bool isValidWebData = true;
+                if (guest.empty() || phone.empty() || pass.empty() || inDate.length() != 10 || outDate.length() != 10) {
+                    isValidWebData = false;
+                }
+                if (inDate.length() == 10 && (inDate[2] != '.' || inDate[5] != '.')) isValidWebData = false;
+                if (outDate.length() == 10 && (outDate[2] != '.' || outDate[5] != '.')) isValidWebData = false;
+
+                if (!isValidWebData) {
+                    replyJson = { {"status", "ERROR"}, {"message", "Помилка: Некоректний формат даних або порушено маску введення на сайті!"} };
+                    Logger::error("Блокування веб-запиту: порушення масок введення");
+                } else {
+                    bool ok = hotel.addBookingFromWebExtended(guest, phone, pass, cat, inDate, outDate, payMethod);
+                    replyJson = { {"status", ok ? "OK" : "ERROR"}, {"message", ok ? "Бронювання успішно створено" : "Немає вільних номерів на ці дати"} };
+                }
             }
             else if (cmd == "SHOW_RESERVATIONS") {
                 string filter = requestJson.value("passport", "");
                 if (filter.empty()) filter = requestJson.value("passport_filter", "");
+                Logger::info("Запит журналу замовлень. Фільтр паспорта: " + (filter.empty() ? "всі" : filter));
                 replyJson = { {"status", "OK"}, {"arr", json::parse(hotel.getReservationsStr(filter))} };
             }
             else if (cmd == "SHOW_GUESTS") {
@@ -252,9 +275,30 @@ void handleHttpGuest(SOCKET clientSocket, HotelSystem& hotel, const std::string&
             else if (cmd == "PROCESS_PAYMENT") {
                 int bId = requestJson.value("id", 0);
                 string method = requestJson.value("method", "cash");
-                bool ok = hotel.processReceptionPayment(bId, method);
-                replyJson = { {"status", ok ? "OK" : "ERROR"}, {"message", ok ? "Оплату проведено" : "Помилка транзакції"} };
-                if (ok) Logger::info("Касовий ордер успішно оплачено через термінал/готівку");
+
+                const char* connInfo = "host=127.0.0.1 port=5432 dbname=hotel_db user=postgres password=root";
+                PGconn* conn = PQconnectdb(connInfo);
+                bool isCancelled = false;
+
+                if (conn && PQstatus(conn) == CONNECTION_OK) {
+                    string checkSql = "SELECT status FROM bookings WHERE id = " + to_string(bId) + ";";
+                    PGresult* checkRes = PQexec(conn, checkSql.c_str());
+                    if (PQresultStatus(checkRes) == PGRES_TUPLES_OK && PQntuples(checkRes) > 0) {
+                        string currentStatus = PQgetvalue(checkRes, 0, 0);
+                        if (currentStatus == "CANCELLED") isCancelled = true;
+                    }
+                    PQclear(checkRes);
+                    PQfinish(conn);
+                }
+
+                if (isCancelled) {
+                    replyJson = { {"status", "ERROR"}, {"message", "Помилка: Неможливо провести оплату для скасованого замовлення!"} };
+                    Logger::error("Блокування транзакції: спроба оплати скасованої броні ID " + to_string(bId));
+                } else {
+                    bool ok = hotel.processReceptionPayment(bId, method);
+                    replyJson = { {"status", ok ? "OK" : "ERROR"}, {"message", ok ? "Оплату проведено" : "Помилка транзакції"} };
+                    if (ok) Logger::info("Касовий ордер успішно оплачено через термінал/готівку");
+                }
             }
             else if (cmd == "UPDATE_BOOKING_DATA") {
                 int bId = requestJson.value("id", 0);
@@ -271,7 +315,7 @@ void handleHttpGuest(SOCKET clientSocket, HotelSystem& hotel, const std::string&
                 replyJson = { {"status", ok ? "OK" : "ERROR"}, {"message", ok ? "Звіт збережено" : "Збій експорту"} };
             }
         } catch (const exception& err) {
-            Logger::error("Критична ошибка обробки JSON запиту мережевого шлюзу");
+            Logger::error("Критична помилка обробки JSON запиту мережевого шлюзу");
             replyJson = { {"status", "ERROR"}, {"message", "Критична помилка шлюзу"} };
         }
 
